@@ -7,6 +7,11 @@ Whisper Transcription API
 - Cleans up all temporary files after processing
 """
 
+import sys
+print("----------------------------------------------------------------", flush=True)
+print("APPLICATION STARTUP BEGINNING...", flush=True)
+print("Importing modules...", flush=True)
+
 import os
 import uuid
 import shutil
