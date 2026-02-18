@@ -28,11 +28,18 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# --- Load Model Once at Startup ---
+# --- Global Model Variable ---
+model = None
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"[INFO] Loading Whisper large-v3 on device: {DEVICE}")
-model = whisper.load_model("large-v3", device=DEVICE)
-print("[INFO] Model loaded successfully!")
+
+def get_model():
+    global model
+    if model is None:
+        print(f"[INFO] Loading Whisper large-v3 on device: {DEVICE}...")
+        # This will only happen during the first request
+        model = whisper.load_model("large-v3", device=DEVICE)
+        print("[INFO] Model loaded successfully!")
+    return model
 
 
 # --- Request Schema ---
@@ -43,9 +50,10 @@ class TranscribeRequest(BaseModel):
 # --- Health Check ---
 @app.get("/")
 async def health_check():
+    """Returns instant success to keep the PaaS happy."""
     return {
-        "status": "running",
-        "model": "whisper-large-v3",
+        "status": "online",
+        "model_loaded": model is not None,
         "device": DEVICE,
         "gpu_available": torch.cuda.is_available(),
     }
@@ -59,6 +67,9 @@ async def transcribe(request: TranscribeRequest):
     transcribes it with Whisper, and returns the text.
     The downloaded file is deleted after transcription.
     """
+    # Load model if not already loaded
+    current_model = get_model()
+    
     url = request.url
     job_id = str(uuid.uuid4())[:8]
     temp_dir = f"/tmp/whisper_jobs/{job_id}"
@@ -111,7 +122,7 @@ async def transcribe(request: TranscribeRequest):
 
         # 4. Transcribe with Whisper
         print(f"[{job_id}] Starting transcription...")
-        transcription = model.transcribe(
+        transcription = current_model.transcribe(
             audio_file,
             verbose=False,
         )
